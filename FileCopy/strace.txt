@@ -1,0 +1,40 @@
+[sakiir@Sakiir-PC Prog1]$ gcc filecpy.c -o filecpy
+[sakiir@Sakiir-PC Prog1]$ ./filecpy 
+[+] Usage: ./filecpy <input file> <output file>
+[sakiir@Sakiir-PC Prog1]$ strace ./filecpy /etc/passwd /tmp/output.txt
+execve("./filecpy", ["./filecpy", "/etc/passwd", "/tmp/output.txt"], 0x7fff04a91430 /* 38 vars */) = 0
+brk(NULL)                               = 0x56396e09a000
+access("/etc/ld.so.preload", R_OK)      = -1 ENOENT (No such file or directory)
+openat(AT_FDCWD, "/etc/ld.so.cache", O_RDONLY|O_CLOEXEC) = 3
+fstat(3, {st_mode=S_IFREG|0644, st_size=221866, ...}) = 0
+mmap(NULL, 221866, PROT_READ, MAP_PRIVATE, 3, 0) = 0x7f8ac04c1000
+close(3)                                = 0
+openat(AT_FDCWD, "/usr/lib/libc.so.6", O_RDONLY|O_CLOEXEC) = 3
+read(3, "\177ELF\2\1\1\3\0\0\0\0\0\0\0\0\3\0>\0\1\0\0\0`\20\2\0\0\0\0\0"..., 832) = 832
+fstat(3, {st_mode=S_IFREG|0755, st_size=2065784, ...}) = 0
+mmap(NULL, 8192, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0) = 0x7f8ac04bf000
+mmap(NULL, 3893488, PROT_READ|PROT_EXEC, MAP_PRIVATE|MAP_DENYWRITE, 3, 0) = 0x7f8abff1d000
+mprotect(0x7f8ac00cb000, 2093056, PROT_NONE) = 0
+mmap(0x7f8ac02ca000, 24576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_DENYWRITE, 3, 0x1ad000) = 0x7f8ac02ca000
+mmap(0x7f8ac02d0000, 14576, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) = 0x7f8ac02d0000
+close(3)                                = 0
+arch_prctl(ARCH_SET_FS, 0x7f8ac04c04c0) = 0
+mprotect(0x7f8ac02ca000, 16384, PROT_READ) = 0
+mprotect(0x56396d038000, 4096, PROT_READ) = 0
+mprotect(0x7f8ac04f8000, 4096, PROT_READ) = 0
+munmap(0x7f8ac04c1000, 221866)          = 0
+openat(AT_FDCWD, "/etc/passwd", O_RDONLY) = 3
+openat(AT_FDCWD, "/tmp/output.txt", O_WRONLY|O_CREAT|O_TRUNC, 0744) = 4
+read(3, "root:x:0:0:root:/root:/bin/bash\n"..., 4096) = 1532
+write(4, "root:x:0:0:root:/root:/bin/bash\n"..., 1532) = 1532
+read(3, "", 4096)                       = 0
+fstat(1, {st_mode=S_IFCHR|0620, st_rdev=makedev(136, 0), ...}) = 0
+brk(NULL)                               = 0x56396e09a000
+brk(0x56396e0bb000)                     = 0x56396e0bb000
+write(1, "[+] Copied all data\n", 20[+] Copied all data
+)   = 20
+close(3)                                = 0
+close(4)                                = 0
+exit_group(0)                           = ?
++++ exited with 0 +++
+[sakiir@Sakiir-PC Prog1]$
