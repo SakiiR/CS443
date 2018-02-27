@@ -259,7 +259,7 @@ void                        *producer(void *arg)
             printf("[~] Producer: block %d too high\n", block);
       #endif
       pthread_mutex_unlock(current_thread->mutex);
-      usleep(5000); /* Wait a bit for the next producing (but unlock to let the consumer consume) */
+      //usleep(5000); /* Wait a bit for the next producing (but unlock to let the consumer consume) */
       continue;
     }
     /* Generate a random block into the good memory index */
