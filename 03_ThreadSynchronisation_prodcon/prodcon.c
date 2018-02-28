@@ -77,7 +77,6 @@ int                         init_threads()
     fprintf(stderr, "[-] Failed to start producer thread\n");
     return RETURN_FAILURE;
   }
-  usleep(5000); /* Make sure the producer start first */
   if (pthread_create(&consumer_thread.thread_id,
         &consumer_thread.thread_attr,
         consumer,
@@ -193,8 +192,7 @@ int                         generate_random_block(t_thread *thread, int block, u
 uint16_t                    generate_checksum(unsigned char *block)
 {
   unsigned int              count = DATA_SIZE;
-  register uint16_t         sum = 0;
-
+  uint16_t                  sum = 0;
 
   while (count > 1)
   {
@@ -214,7 +212,7 @@ uint16_t                    generate_checksum(unsigned char *block)
 void                        store_checksum(unsigned char *block, uint16_t checksum)
 {
   block[DATA_SIZE + 1] = checksum & 0x00FF;
-  block[DATA_SIZE] = (checksum >> 8) & 0x00FF;
+  block[DATA_SIZE] =     (checksum >> 8) & 0x00FF;
 }
 
 /**
@@ -244,6 +242,7 @@ void                        *producer(void *arg)
   pthread_mutex_unlock(current_thread->mutex);
   while (i < ntimes)
   {
+    pthread_mutex_lock(current_thread->mutex);
     /* Retrieve the semaphore value to know which block to produce */
     if (sem_getvalue(current_thread->semaphore, &block) == SYSCALL_FAILED)
     {
@@ -252,14 +251,12 @@ void                        *producer(void *arg)
       return NULL;
     }
     /* Begin of critical section */
-    pthread_mutex_lock(current_thread->mutex);
     if (block * BLOCK_SIZE >= current_thread->prodcon->memsize)
     {
       #if DEBUG
             printf("[~] Producer: block %d too high\n", block);
       #endif
       pthread_mutex_unlock(current_thread->mutex);
-      //usleep(5000); /* Wait a bit for the next producing (but unlock to let the consumer consume) */
       continue;
     }
     /* Generate a random block into the good memory index */
@@ -271,10 +268,10 @@ void                        *producer(void *arg)
     store_checksum(block_ptr, checksum);
     printf("[~] Produced block %d\n", block);
     ++i;
-    /* End of critical section */
-    pthread_mutex_unlock(current_thread->mutex);
     /* Let the consumer know we just produced one more block */
     sem_post(current_thread->semaphore);
+    /* End of critical section */
+    pthread_mutex_unlock(current_thread->mutex);
   }
   printf("[~] I produced enough data\n");
   fflush(stdout);
@@ -300,8 +297,17 @@ void                        *consumer(void *arg)
   pthread_mutex_unlock(current_thread->mutex);
   while(i < ntimes)
   {
+    /* Critical secion */
+    pthread_mutex_lock(current_thread->mutex);
     /* Waiting for sem > 0 */
-    sem_wait(current_thread->semaphore);
+    if (sem_trywait(current_thread->semaphore) == SYSCALL_FAILED)
+    {
+      #if DEBUG
+        printf("[~] Can't wait .. block should be too low ..\n");
+      #endif
+      pthread_mutex_unlock(current_thread->mutex);
+      continue;
+    }
     /* Retrieve the semaphore value to know which block to consume */
     if (sem_getvalue(current_thread->semaphore, &block) == SYSCALL_FAILED)
     {
@@ -309,15 +315,12 @@ void                        *consumer(void *arg)
       pthread_mutex_unlock(current_thread->mutex);
       return NULL;
     }
-    /* Critical secion */
-    pthread_mutex_lock(current_thread->mutex);
     if (BLOCK_SIZE * block >= current_thread->prodcon->memsize)
     {
       #if DEBUG
             printf("[~] Consumer: block %d too high\n", block);
       #endif
       pthread_mutex_unlock(current_thread->mutex);
-      usleep(5000); /* Wait a bit for the next consuming (but unlock to let the producer produce) */
       continue;
     }
     /* Checksum Checks */
@@ -327,11 +330,10 @@ void                        *consumer(void *arg)
       fprintf(stderr, "[-] Computed checksum is not equals to the memory checksum\n");
     printf("[~] Consumed block %d\n", block);
     /* End of critical section */
-    pthread_mutex_unlock(current_thread->mutex);
     ++i;
+    pthread_mutex_unlock(current_thread->mutex);
   }
   printf("[~] I consumed enough data\n");
   fflush(stdout);
   return NULL;
 }
-
