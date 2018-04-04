@@ -2,22 +2,22 @@
  * Erwan Dupard - CS443 - Virtual Memory Manager
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <stdio.h>
+# include <string.h>
+# include <stdlib.h>
+# include <stdint.h>
+# include <stdio.h>
 
-#define BACKING_STORE           ("./BACKING_STORE.bin")
+# define BACKING_STORE           ("./BACKING_STORE.bin")
 
-#define DEFAULT_NUMBER_VALUE    ( -1 )
+# define DEFAULT_NUMBER_VALUE    ( -1 )
 
-#define TLB_SIZE                ( 16 )
+# define TLB_SIZE                ( 16 )
 
-#define PHYSICAL_MEMORY_SIZE    ( 0xFFFF )
-#define PAGE_TABLE_SIZE         ( 0xFF )
+# define PHYSICAL_MEMORY_SIZE    ( 0xFFFF )
+# define PAGE_TABLE_SIZE         ( 0xFF )
 
-#define RETURN_FAILURE          ( 1 )
-#define RETURN_SUCCESS          ( 0 )
+# define RETURN_FAILURE          ( 1 )
+# define RETURN_SUCCESS          ( 0 )
 
 typedef struct                  s_tlb_entry
 {
@@ -135,6 +135,7 @@ static char                     process_address(t_mmu *mmu, uint16_t address)
 {
   uint8_t                       offset = get_offset(address);
   uint8_t                       page_number = get_page_number(address);
+  uint16_t                      physical_addr;
   int                           frame_number = mmu->page_table[page_number];
 
   if (frame_number == DEFAULT_NUMBER_VALUE)
@@ -143,8 +144,11 @@ static char                     process_address(t_mmu *mmu, uint16_t address)
     page_fault(mmu, page_number);
     return RETURN_FAILURE;
   }
-  printf("[^] Physical address: %08x\n", (frame_number + offset) * 256);
-  printf(" - - - - - - - - - - - - - - -\n");
+  physical_addr = (frame_number + offset) * 256;
+  printf("| Logical address:  %08x    |\n", (uint16_t)address);
+  printf("| Physical address: %08x    |\n", physical_addr);
+  printf("| Value:            %08x    |\n", mmu->physical_memory[physical_addr]);
+  printf("+ - - - - - - - - - - - - - - - +\n");
   return RETURN_SUCCESS;
 }
 
