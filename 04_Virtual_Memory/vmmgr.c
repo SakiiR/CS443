@@ -2,13 +2,13 @@
  * Erwan Dupard - CS443 - Virtual Memory Manager
  */
 
+# include <ctype.h>
 # include <string.h>
 # include <stdlib.h>
 # include <stdint.h>
 # include <stdio.h>
 
 # define DEBUG                (0)
-
 # define BACKING_STORE        ("./BACKING_STORE.bin")
 # define DEFAULT_NUMBER_VALUE ( -1 )
 # define TLB_SIZE             ( 16 )
@@ -273,7 +273,7 @@ static char                   init_mmu(t_mmu *mmu)
  * Function called to process an address
  * (to translate this virtual address into physical address)
  */
-static char                   process_address(t_mmu *mmu, uint16_t address)
+static char                   process_address(t_mmu *mmu, uint16_t address, int n)
 {
   uint8_t                     offset = get_offset(address);
   uint8_t                     page_number = get_page_number(address);
@@ -306,9 +306,13 @@ static char                   process_address(t_mmu *mmu, uint16_t address)
   }
   /* Retrieving physical addr as a 16 bits integer */
   physical_addr = (frame_number * 256) + offset;
-  printf("[+] VAddr:  %08x, PAddr: %08x, *PAddr: %02x\n", (uint16_t)address,
+  printf("[+] [%04d] - VAddr:  %08x (%d), PAddr: %08x, *PAddr: %02x ('%c')\n",
+      n,
+      (uint16_t)address,
+      (uint16_t)address,
       physical_addr,
-      mmu->physical_memory[physical_addr]
+      mmu->physical_memory[physical_addr],
+      isprint(mmu->physical_memory[physical_addr]) ? mmu->physical_memory[physical_addr] : ' '
       );
   return RETURN_SUCCESS;
 }
@@ -339,7 +343,7 @@ int                           main(int argc, char **argv)
   printf("[^] Processing %llu addresses\n", mmu.addresses_count);
   /* Iterating over addresses and process them */
   for (unsigned i = 0 ; i < mmu.addresses_count ; ++i)
-    (void)process_address(&mmu, addresses[i]); /* Don't care about the return value */
+    (void)process_address(&mmu, addresses[i], i); /* Don't care about the return value */
   /* Display Page fault and TLB hit percentage */
   printf("# Page fault : %llu - %f%%\n", mmu.page_fault, (((float)mmu.page_fault * 100.0) / (float)mmu.addresses_count));
   printf("# TLB hits   : %llu - %f%%\n", mmu.tlb_hits, (((float)mmu.tlb_hits * 100.0) / (float)mmu.addresses_count));
