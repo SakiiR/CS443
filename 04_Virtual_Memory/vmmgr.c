@@ -20,8 +20,8 @@
 /* TLB entry definition (Linked List - FIFO - cf pop_tlb, add_tlb_entry) */
 typedef struct                s_tlb_entry
 {
-  uint8_t                      page_number;
-  uint8_t                      frame_number;
+  uint8_t                     page_number;
+  uint8_t                     frame_number;
   struct s_tlb_entry          *next;
 }                             t_tlb_entry;
 
@@ -307,9 +307,9 @@ static char                   process_address(t_mmu *mmu, uint16_t address)
   /* Retrieving physical addr as a 16 bits integer */
   physical_addr = (frame_number * 256) + offset;
   printf("[+] VAddr:  %08x, PAddr: %08x, *PAddr: %02x\n", (uint16_t)address,
-                                                          physical_addr,
-                                                          mmu->physical_memory[physical_addr]
-        );
+      physical_addr,
+      mmu->physical_memory[physical_addr]
+      );
   return RETURN_SUCCESS;
 }
 
