@@ -306,7 +306,7 @@ static char                   process_address(t_mmu *mmu, uint16_t address, int 
   }
   /* Retrieving physical addr as a 16 bits integer */
   physical_addr = (frame_number * 256) + offset;
-  printf("[+] [%04d] - VAddr:  %08x (%d), PAddr: %08x, *PAddr: %02x ('%c')\n",
+  printf("[+] [%04d] - VAddr:  %08x (%010d), PAddr: %08x, *PAddr: %02x ('%c')\n",
       n,
       (uint16_t)address,
       (uint16_t)address,
