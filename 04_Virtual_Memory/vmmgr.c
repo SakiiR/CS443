@@ -7,47 +7,59 @@
 # include <stdint.h>
 # include <stdio.h>
 
-# define BACKING_STORE          ("./BACKING_STORE.bin")
-# define DEFAULT_NUMBER_VALUE   ( -1 )
-# define TLB_SIZE               ( 16 )
-# define PHYSICAL_MEMORY_SIZE   ( 0xFFFF )
-# define PAGE_TABLE_SIZE        ( 0xFF )
-# define RETURN_FAILURE         ( 1 )
-# define RETURN_SUCCESS         ( 0 )
+# define BACKING_STORE        ("./BACKING_STORE.bin")
+# define DEFAULT_NUMBER_VALUE ( -1 )
+# define TLB_SIZE             ( 16 )
+# define PHYSICAL_MEMORY_SIZE ( 0xFFFF )
+# define PAGE_TABLE_SIZE      ( 0xFF )
+# define RETURN_FAILURE       ( 1 )
+# define RETURN_SUCCESS       ( 0 )
 
 /* TLB entry definition (Linked List) */
-typedef struct                  s_tlb_entry
+typedef struct                s_tlb_entry
 {
-  int8_t                        page_number;
-  int8_t                        frame_number;
-  struct s_tlb_entry            *next;
-}                               t_tlb_entry;
+  int8_t                      page_number;
+  int8_t                      frame_number;
+  struct s_tlb_entry          *next;
+}                             t_tlb_entry;
 
-typedef struct                  s_mmu
+/**
+ * Base MMU structure.
+ */
+typedef struct                s_mmu
 {
-  int8_t                        page_table[PAGE_TABLE_SIZE];
-  int8_t                        physical_memory[PHYSICAL_MEMORY_SIZE];
-  struct s_tlb_entry            *tlb;
-  FILE                          *bs;
-  unsigned long long            page_fault;
-  unsigned long long            tlb_hits;
-  unsigned long long            addresses_count;
-}                               t_mmu;
+  int8_t                      page_table[PAGE_TABLE_SIZE];
+  int8_t                      physical_memory[PHYSICAL_MEMORY_SIZE];
+  struct s_tlb_entry          *tlb;
+  FILE                        *bs;
+  unsigned long long          page_fault;
+  unsigned long long          tlb_hits;
+  unsigned long long          addresses_count;
+}                             t_mmu;
 
-static inline uint8_t           get_offset(uint16_t address)
+/**
+ * Extract offset from virtual address
+ */
+static inline uint8_t         get_offset(uint16_t address)
 {
   return address & 0x00FF;
 }
 
-static inline uint8_t           get_page_number(uint16_t address)
+/**
+ * Extract page_number from virtual address
+ */
+static inline uint8_t         get_page_number(uint16_t address)
 {
   return (address & 0xFF00) >> 8;
 }
 
-static size_t                   tlb_size(struct s_tlb_entry **tlb)
+/**
+ * Return the TLB linked list size.
+ */
+static size_t                 tlb_size(struct s_tlb_entry **tlb)
 {
-  size_t                        size = 0;
-  t_tlb_entry                   *it = *tlb; 
+  size_t                      size = 0;
+  t_tlb_entry                 *it = *tlb;
 
   while (it)
   {
@@ -57,10 +69,33 @@ static size_t                   tlb_size(struct s_tlb_entry **tlb)
   return size;
 }
 
-static char                     free_tlb(struct s_tlb_entry **tlb)
+static char                   pop_tlb(struct s_tlb_entry **tlb)
 {
-  t_tlb_entry                   *it = *tlb;
-  t_tlb_entry                   *tmp;
+  t_tlb_entry                 *it = *tlb;
+  t_tlb_entry                 *ret = NULL;
+
+  if (it == NULL)
+    return RETURN_FAILURE;
+  if (it->next == NULL)
+  {
+    free(it);
+    *tlb = NULL;
+    return RETURN_SUCCESS;
+  }
+  while (it->next->next)
+    it = it->next;
+  free(it->next);
+  it->next = NULL;
+  return RETURN_FAILURE;
+}
+
+/**
+ * Free the TLB linked list
+ */
+static char                   free_tlb(struct s_tlb_entry **tlb)
+{
+  t_tlb_entry                 *it = *tlb;
+  t_tlb_entry                 *tmp;
 
   while (it)
   {
@@ -71,9 +106,13 @@ static char                     free_tlb(struct s_tlb_entry **tlb)
   return RETURN_SUCCESS;
 }
 
-static char                     find_in_tlb(t_mmu *mmu, uint8_t page_number, uint8_t *frame_number)
+/**
+ * Find the virtual address's page number into the tlb and
+ * store the associated frame_number.
+ */
+static char                   find_in_tlb(t_mmu *mmu, uint8_t page_number, uint8_t *frame_number)
 {
-  t_tlb_entry                   *it = mmu->tlb;
+  t_tlb_entry                 *it = mmu->tlb;
 
   while (it)
   {
@@ -88,15 +127,19 @@ static char                     find_in_tlb(t_mmu *mmu, uint8_t page_number, uin
   return RETURN_FAILURE;
 }
 
-static char                     add_tlb_entry(struct s_tlb_entry **tlb, int8_t page_number, int8_t frame_number)
+/**
+ * Create a new allocated node in the tlb
+ * linked list and add it to this linked list.
+ */
+static char                   add_tlb_entry(struct s_tlb_entry **tlb, int8_t page_number, int8_t frame_number)
 {
-  t_tlb_entry                   *e;
-  t_tlb_entry                   *it = *tlb;
+  t_tlb_entry                 *e;
+  t_tlb_entry                 *it = *tlb;
 
   if (tlb_size(tlb) >= TLB_SIZE)
   {
     printf("[^] TLB table is full !\n");
-    return RETURN_FAILURE;
+    pop_tlb(tlb); /* Let some place for the next node */
   }
   if ((e = malloc(sizeof(*e))) == NULL)
   {
@@ -121,14 +164,15 @@ static char                     add_tlb_entry(struct s_tlb_entry **tlb, int8_t p
  * Read the given filename and return an allocated
  * uint32_t array of addresses.
  */
-static uint16_t                 *read_address_file(char const *filename, unsigned long long *line_count)
+static uint16_t               *read_address_file(char const *filename, unsigned long long *line_count)
 {
-  FILE                          *fp = NULL;
-  char                          *line = NULL;
-  uint16_t                      *addresses = NULL;
-  size_t                        len = 0;
-  unsigned long long            lines = 0;
-  ssize_t                       read;
+  FILE                        *fp = NULL;
+  char                        *line = NULL;
+  uint16_t                    *addresses = NULL;
+  size_t                      len = 0;
+  unsigned long long          lines = 0;
+  ssize_t                     read;
+
 
   /* First allocation of the addresses array */
   if ((addresses = malloc(sizeof(*addresses))) == NULL)
@@ -145,7 +189,7 @@ static uint16_t                 *read_address_file(char const *filename, unsigne
   /* Reading file line by line */
   while ((read = getline(&line, &len, fp)) != -1) {
     /* If a line has been read */
-    if (line) 
+    if (line)
     {
       /* Convert the line and store it into the array */
       addresses[lines++] = atoi(line);
@@ -164,7 +208,11 @@ static uint16_t                 *read_address_file(char const *filename, unsigne
   return addresses;
 }
 
-static char                     first_fit(t_mmu *mmu, uint8_t *data, uint8_t frame_number)
+/**
+ * This function is used to find the first memory space
+ * that fit the data block. It search in the page_table.
+ */
+static char                   first_fit(t_mmu *mmu, uint8_t *data, uint8_t frame_number)
 {
   for (unsigned i = 0 ; i < PAGE_TABLE_SIZE; ++i)
     if (mmu->page_table[i] == DEFAULT_NUMBER_VALUE)
@@ -181,10 +229,14 @@ static char                     first_fit(t_mmu *mmu, uint8_t *data, uint8_t fra
   return RETURN_SUCCESS;
 }
 
-static char                     page_fault(t_mmu *mmu, uint8_t page_number)
+/**
+ * This function describe the behaviour of
+ * a page_fault.
+ */
+static char                   page_fault(t_mmu *mmu, uint8_t page_number)
 {
-  uint16_t                      offset = page_number * 256;
-  uint8_t                       data[0xFF + 2];
+  uint16_t                    offset = page_number * 256;
+  uint8_t                     data[0xFF + 2];
 
   if (fseek(mmu->bs, offset, SEEK_SET) == -1)
     return RETURN_FAILURE;
@@ -193,7 +245,10 @@ static char                     page_fault(t_mmu *mmu, uint8_t page_number)
   return RETURN_SUCCESS;
 }
 
-static char                     init_mmu(t_mmu *mmu)
+/**
+ * Initialization of the base mmu structure.
+ */
+static char                   init_mmu(t_mmu *mmu)
 {
   /* Pre opening the backing store to gain speed */
   if ((mmu->bs = fopen(BACKING_STORE, "rb")) == NULL)
@@ -211,13 +266,16 @@ static char                     init_mmu(t_mmu *mmu)
   return RETURN_SUCCESS;
 }
 
-static char                     process_address(t_mmu *mmu, uint16_t address)
+/**
+ * Function called to process an address (to translate this virtual address into physical address)
+ */
+static char                   process_address(t_mmu *mmu, uint16_t address)
 {
-  uint8_t                       offset = get_offset(address);
-  uint8_t                       page_number = get_page_number(address);
-  uint16_t                      physical_addr;
-  int                           frame_number = -1;
-  uint8_t                       tlb_frame_number = 0;
+  uint8_t                     offset = get_offset(address);
+  uint8_t                     page_number = get_page_number(address);
+  uint16_t                    physical_addr;
+  int                         frame_number = DEFAULT_NUMBER_VALUE;
+  uint8_t                     tlb_frame_number = 0;
 
   if (find_in_tlb(mmu, page_number, &tlb_frame_number) == RETURN_SUCCESS)
     frame_number = tlb_frame_number;
@@ -239,10 +297,10 @@ static char                     process_address(t_mmu *mmu, uint16_t address)
   return RETURN_SUCCESS;
 }
 
-int                             main(int argc, char **argv)
+int                           main(int argc, char **argv)
 {
-  t_mmu                         mmu; /* MMU on the stack */
-  uint16_t                      *addresses = NULL;
+  t_mmu                       mmu; /* MMU on the stack */
+  uint16_t                    *addresses = NULL;
 
   if (argc < 2)
   {
